@@ -1,0 +1,13 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="17.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <CustomBuild Include="C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\build\CMakeFiles\01f173089cbcd02f9e6940b033bf583b\generate.stamp.rule">
+      <Filter>CMake Rules</Filter>
+    </CustomBuild>
+  </ItemGroup>
+  <ItemGroup>
+    <Filter Include="CMake Rules">
+      <UniqueIdentifier>{81A34DBF-7C13-328C-ABF4-3361616BF159}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+</Project>

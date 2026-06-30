@@ -1,0 +1,3 @@
+C:/Users/dewpo/Documents/Code/TouchDesigner Plugins/AffectorPOP/build/CMakeFiles/AffectorPOP.dir
+C:/Users/dewpo/Documents/Code/TouchDesigner Plugins/AffectorPOP/build/CMakeFiles/ALL_BUILD.dir
+C:/Users/dewpo/Documents/Code/TouchDesigner Plugins/AffectorPOP/build/CMakeFiles/ZERO_CHECK.dir
