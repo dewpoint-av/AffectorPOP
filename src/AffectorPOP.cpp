@@ -37,9 +37,24 @@ AffectorPOP::AffectorPOP(const OP_NodeInfo* info, POP_Context* context) :
 {
     cudaStreamCreate(&myStream);
 }
-AffectorPOP::~AffectorPOP() { if (myStream) cudaStreamDestroy(myStream); }
+AffectorPOP::~AffectorPOP()
+{
+    if (myStateP) cudaFree(myStateP);
+    if (myStateV) cudaFree(myStateV);
+    if (myStream) cudaStreamDestroy(myStream);
+}
 
-void AffectorPOP::getGeneralInfo(POP_GeneralInfo*, const OP_Inputs*, void*) {}
+void AffectorPOP::getGeneralInfo(POP_GeneralInfo* ginfo, const OP_Inputs* inputs, void*)
+{
+    // Self-Simulate must advance every frame even when the input is static — otherwise a still
+    // point source never re-cooks and the sim looks frozen.
+    ginfo->cookEveryFrame = inputs->getParInt("Selfsim") ? true : false;
+}
+
+void AffectorPOP::pulsePressed(const char* name, void*)
+{
+    if (name && std::string(name) == "Reset") myReseed = true;   // re-seed state from the input
+}
 
 std::vector<std::pair<std::string, OP_SmartRef<POP_Buffer>>>
 AffectorPOP::getAllAttributes(POP_AttributeClass c, const OP_POPInput* input)
@@ -127,7 +142,8 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
     ap.radius   = (float)inputs->getParDouble("Radius");
     ap.animT    = (float)inputs->getParDouble("Animoffset");
     ap.dt       = (float)inputs->getParDouble("Timestep");
-    ap.integrate= inputs->getParInt("Integrate");
+    bool selfSim = inputs->getParInt("Selfsim") != 0;
+    ap.integrate= selfSim ? 1 : inputs->getParInt("Integrate");   // self-sim always integrates internally
 
     auto makeBuf = [&](uint64_t elemSize) -> OP_SmartRef<POP_Buffer>
     {
@@ -154,10 +170,45 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
             if (ap.integrate) Pout = makeBuf(3 * sizeof(float));
 
             myContext->beginCUDAOperations(nullptr);
-            launchAffector(Pin->getData(nullptr), Pout ? Pout->getData(nullptr) : nullptr,
-                           Vin ? Vin->getData(nullptr) : nullptr, Vout ? Vout->getData(nullptr) : nullptr,
-                           FDin ? FDin->getData(nullptr) : nullptr, FLin ? FLin->getData(nullptr) : nullptr,
-                           n, ap, myStream);
+            if (selfSim && Pout)
+            {
+                // Self-contained sim: persistent P/V device state, (re)seeded from the input, stepped in
+                // place each frame, then copied to the TD output. No external Feedback POP required.
+                const size_t bytes = (size_t)n * 3 * sizeof(float);
+                bool reseed = myReseed || myStateN != n || !myStateP || !myStateV;
+                if (reseed)
+                {
+                    if (myStateP) { cudaFree(myStateP); myStateP = nullptr; }
+                    if (myStateV) { cudaFree(myStateV); myStateV = nullptr; }
+                    cudaError_t ea = cudaMalloc(&myStateP, bytes);
+                    cudaError_t eb = cudaMalloc(&myStateV, bytes);
+                    if (ea != cudaSuccess || eb != cudaSuccess) { myError = "Self-sim allocation failed"; myStateN = 0; }
+                    else
+                    {
+                        cudaMemcpyAsync(myStateP, Pin->getData(nullptr), bytes, cudaMemcpyDeviceToDevice, myStream);
+                        if (Vin) cudaMemcpyAsync(myStateV, Vin->getData(nullptr), bytes, cudaMemcpyDeviceToDevice, myStream);
+                        else     cudaMemsetAsync(myStateV, 0, bytes, myStream);
+                        myStateN = n; myReseed = false;
+                    }
+                }
+                if (myStateP && myStateV)
+                {
+                    // step state IN PLACE (the kernel reads P/V into registers before writing, so aliasing
+                    // in==out is safe), then copy state -> output for downstream.
+                    launchAffector(myStateP, myStateP, myStateV, myStateV,
+                                   FDin ? FDin->getData(nullptr) : nullptr, FLin ? FLin->getData(nullptr) : nullptr,
+                                   n, ap, myStream);
+                    cudaMemcpyAsync(Pout->getData(nullptr), myStateP, bytes, cudaMemcpyDeviceToDevice, myStream);
+                    cudaMemcpyAsync(Vout->getData(nullptr), myStateV, bytes, cudaMemcpyDeviceToDevice, myStream);
+                }
+            }
+            else
+            {
+                launchAffector(Pin->getData(nullptr), Pout ? Pout->getData(nullptr) : nullptr,
+                               Vin ? Vin->getData(nullptr) : nullptr, Vout ? Vout->getData(nullptr) : nullptr,
+                               FDin ? FDin->getData(nullptr) : nullptr, FLin ? FLin->getData(nullptr) : nullptr,
+                               n, ap, myStream);
+            }
             myContext->endCUDAOperations(nullptr);
         }
     }
@@ -230,8 +281,23 @@ AffectorPOP::setupParameters(OP_ParameterManager* manager, void*)
     f("Animoffset", "Turbulence Anim Offset", 0.0, 0.0, 100.0);
     f("Timestep", "Timestep (dt)", 1.0/60.0, 0.0, 0.1);
     {
+        // Default ON: works out-of-the-box on regular point systems (the Affector moves the points).
+        // NOTE: turn this OFF when driving the SPH fluid in its feedback loop — the SPH owns position
+        // integration, so ON there double-integrates and explodes.
         OP_NumericParameter np; np.name = "Integrate"; np.label = "Integrate Position"; np.page = "Affector";
+        np.defaultValues[0] = 1; np.minValues[0] = 0; np.maxValues[0] = 1;
+        manager->appendToggle(np);
+    }
+    {
+        // Self-contained simulation: the node keeps its own particle state and steps every frame, so
+        // it accumulates motion WITHOUT an external Feedback POP. Forces integration on internally.
+        // Leave OFF to use it as a stateless stepper inside an existing feedback loop (e.g. the SPH fluid).
+        OP_NumericParameter np; np.name = "Selfsim"; np.label = "Self Simulate (no feedback loop)"; np.page = "Affector";
         np.defaultValues[0] = 0; np.minValues[0] = 0; np.maxValues[0] = 1;
         manager->appendToggle(np);
+    }
+    {
+        OP_NumericParameter np; np.name = "Reset"; np.label = "Reset"; np.page = "Affector";
+        manager->appendPulse(np);   // re-seed the self-sim state from the current input
     }
 }

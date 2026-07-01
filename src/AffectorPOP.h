@@ -23,6 +23,7 @@ public:
     virtual void    getInfoCHOPChan(int32_t index, OP_InfoCHOPChan* chan, void*) override;
     virtual void    getErrorString(OP_String* error, void*) override;
     virtual void    setupParameters(OP_ParameterManager* manager, void*) override;
+    virtual void    pulsePressed(const char* name, void*) override;
 
 private:
     std::vector<std::pair<std::string, OP_SmartRef<POP_Buffer>>>
@@ -38,4 +39,12 @@ private:
     POP_Context*       myContext;
     const char*        myError;
     uint32_t           myLastNumPoints;
+
+    // Self-Simulate mode: internal persistent particle state so the node is a self-contained sim
+    // (no external Feedback POP needed). Raw device buffers on the POP context, (re)seeded from the
+    // input P/v on first cook / point-count change / Reset pulse, stepped every frame (cookEveryFrame).
+    void*              myStateP  = nullptr;   // float3[myStateN]
+    void*              myStateV  = nullptr;   // float3[myStateN]
+    uint32_t           myStateN  = 0;
+    bool               myReseed  = true;
 };
