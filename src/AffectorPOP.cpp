@@ -129,26 +129,34 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
     OP_SmartRef<POP_Buffer> Vout, Pout;
     if (haveP && n > 0)
     {
-        // Force-CUDA ONLY the buffers the kernel reads (a forced CUDA download must live inside
-        // begin/end). Everything else stays CPUOrCUDA and passes through safely.
-        POP_GetBufferInfo cgia; cgia.location = POP_BufferLocation::CUDA; cgia.stream = myStream;
-        const POP_Attribute* pA = input->getAttribute(POP_AttributeClass::Point, "P", nullptr);
-        OP_SmartRef<POP_Buffer> Pin = pA ? pA->getBuffer(cgia, nullptr) : OP_SmartRef<POP_Buffer>();
-        OP_SmartRef<POP_Buffer> Vin, FDin, FLin;
-        if (haveV)  { const POP_Attribute* a = input->getAttribute(POP_AttributeClass::Point, "v", nullptr);        if (a) Vin  = a->getBuffer(cgia, nullptr); }
-        if (haveFD) { const POP_Attribute* a = input->getAttribute(POP_AttributeClass::Point, "fieldDir", nullptr); if (a) FDin = a->getBuffer(cgia, nullptr); }
-        if (haveFL) { const POP_Attribute* a = input->getAttribute(POP_AttributeClass::Point, "field", nullptr);    if (a) FLin = a->getBuffer(cgia, nullptr); }
+        const POP_Attribute* pA  = input->getAttribute(POP_AttributeClass::Point, "P", nullptr);
+        const POP_Attribute* vA  = haveV  ? input->getAttribute(POP_AttributeClass::Point, "v", nullptr)        : nullptr;
+        const POP_Attribute* fdA = haveFD ? input->getAttribute(POP_AttributeClass::Point, "fieldDir", nullptr) : nullptr;
+        const POP_Attribute* flA = haveFL ? input->getAttribute(POP_AttributeClass::Point, "field", nullptr)    : nullptr;
 
-        if (Pin)
+        if (pA)
         {
-            Vout = makeBuf(3 * sizeof(float));                 // always output velocity
+            Vout = makeBuf(3 * sizeof(float));                 // always output velocity (createBuffer: device alloc)
             if (ap.integrate) Pout = makeBuf(3 * sizeof(float));
 
+            // CRITICAL: the forced-CUDA getBuffer() calls (the GL/SSBO->CUDA interop map) MUST live
+            // INSIDE beginCUDAOperations/endCUDAOperations. Calling them outside leaks an interop
+            // registration per cook => the driver hangs after ~a couple seconds (esp. with a live GLSL-
+            // SPH input re-mapping a fresh SSBO every frame, and outside a feedback loop). See the
+            // suite's hard-won CUDA-POP lessons (#3).
+            POP_GetBufferInfo cgia; cgia.location = POP_BufferLocation::CUDA; cgia.stream = myStream;
             myContext->beginCUDAOperations(nullptr);
-            launchAffector(Pin->getData(nullptr), Pout ? Pout->getData(nullptr) : nullptr,
-                           Vin ? Vin->getData(nullptr) : nullptr, Vout ? Vout->getData(nullptr) : nullptr,
-                           FDin ? FDin->getData(nullptr) : nullptr, FLin ? FLin->getData(nullptr) : nullptr,
-                           n, ap, myStream);
+            OP_SmartRef<POP_Buffer> Pin  = pA->getBuffer(cgia, nullptr);
+            OP_SmartRef<POP_Buffer> Vin  = vA  ? vA->getBuffer(cgia, nullptr)  : OP_SmartRef<POP_Buffer>();
+            OP_SmartRef<POP_Buffer> FDin = fdA ? fdA->getBuffer(cgia, nullptr) : OP_SmartRef<POP_Buffer>();
+            OP_SmartRef<POP_Buffer> FLin = flA ? flA->getBuffer(cgia, nullptr) : OP_SmartRef<POP_Buffer>();
+            if (Pin)
+            {
+                launchAffector(Pin->getData(nullptr), Pout ? Pout->getData(nullptr) : nullptr,
+                               Vin ? Vin->getData(nullptr) : nullptr, Vout ? Vout->getData(nullptr) : nullptr,
+                               FDin ? FDin->getData(nullptr) : nullptr, FLin ? FLin->getData(nullptr) : nullptr,
+                               n, ap, myStream);
+            }
             myContext->endCUDAOperations(nullptr);
         }
     }

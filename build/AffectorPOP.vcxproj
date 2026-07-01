@@ -52,7 +52,7 @@
   </PropertyGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.props" />
   <ImportGroup Label="ExtensionSettings">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.8.props" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.9.props" />
   </ImportGroup>
   <ImportGroup Label="PropertySheets">
     <Import Project="$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props" Condition="exists('$(UserRootDir)\Microsoft.Cpp.$(Platform).user.props')" Label="LocalAppDataPlatform" />
@@ -89,7 +89,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <ClCompile>
       <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/include"</AdditionalOptions>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/include"</AdditionalOptions>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>EnableFastChecks</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -112,10 +112,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_DEBUG;_WINDOWS;NOMINMAX;WIN32_LEAN_AND_MEAN;CMAKE_INTDIR=\"Debug\";AffectorPOP_EXPORTS</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <CudaCompile>
-      <Include>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\include;%(Include)</Include>
+      <Include>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include;%(Include)</Include>
       <Defines>%(Defines);_WINDOWS;NOMINMAX;WIN32_LEAN_AND_MEAN;CMAKE_INTDIR="Debug";AffectorPOP_EXPORTS</Defines>
       <AdditionalOptions>%(AdditionalOptions) -std=c++17 --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_86,code=[compute_86,sm_86] --generate-code=arch=compute_89,code=[compute_89,sm_89] -Xcompiler="/EHsc -Zi -Ob0"</AdditionalOptions>
       <CodeGeneration></CodeGeneration>
@@ -130,7 +130,7 @@
       <UseHostInclude>false</UseHostInclude>
     </CudaCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -138,8 +138,8 @@
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <Link>
-      <AdditionalDependencies>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\lib\x64\cudart.lib;cudadevrt.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/lib/x64;C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/lib/x64/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\lib\x64\cudart.lib;cudadevrt.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/lib/x64;C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/lib/x64/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <DataExecutionPrevention></DataExecutionPrevention>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -162,7 +162,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <ClCompile>
       <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/include"</AdditionalOptions>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/include"</AdditionalOptions>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <ExceptionHandling>Sync</ExceptionHandling>
@@ -186,10 +186,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;NOMINMAX;WIN32_LEAN_AND_MEAN;CMAKE_INTDIR=\"Release\";AffectorPOP_EXPORTS</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <CudaCompile>
-      <Include>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\include;%(Include)</Include>
+      <Include>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include;%(Include)</Include>
       <Defines>%(Defines);_WINDOWS;NDEBUG;NOMINMAX;WIN32_LEAN_AND_MEAN;CMAKE_INTDIR="Release";AffectorPOP_EXPORTS</Defines>
       <AdditionalOptions>%(AdditionalOptions) -std=c++17 --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_86,code=[compute_86,sm_86] --generate-code=arch=compute_89,code=[compute_89,sm_89] -Xcompiler="/EHsc -Ob2"</AdditionalOptions>
       <CodeGeneration></CodeGeneration>
@@ -203,7 +203,7 @@
       <UseHostInclude>false</UseHostInclude>
     </CudaCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -211,8 +211,8 @@
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <Link>
-      <AdditionalDependencies>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\lib\x64\cudart.lib;cudadevrt.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/lib/x64;C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/lib/x64/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\lib\x64\cudart.lib;cudadevrt.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/lib/x64;C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/lib/x64/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <DataExecutionPrevention></DataExecutionPrevention>
       <GenerateDebugInformation>false</GenerateDebugInformation>
@@ -235,7 +235,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='MinSizeRel|x64'">
     <ClCompile>
       <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/include"</AdditionalOptions>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/include"</AdditionalOptions>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <ExceptionHandling>Sync</ExceptionHandling>
@@ -259,10 +259,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;NOMINMAX;WIN32_LEAN_AND_MEAN;CMAKE_INTDIR=\"MinSizeRel\";AffectorPOP_EXPORTS</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <CudaCompile>
-      <Include>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\include;%(Include)</Include>
+      <Include>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include;%(Include)</Include>
       <Defines>%(Defines);_WINDOWS;NDEBUG;NOMINMAX;WIN32_LEAN_AND_MEAN;CMAKE_INTDIR="MinSizeRel";AffectorPOP_EXPORTS</Defines>
       <AdditionalOptions>%(AdditionalOptions) -std=c++17 --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_86,code=[compute_86,sm_86] --generate-code=arch=compute_89,code=[compute_89,sm_89] -Xcompiler="/EHsc -Ob1"</AdditionalOptions>
       <CodeGeneration></CodeGeneration>
@@ -276,7 +276,7 @@
       <UseHostInclude>false</UseHostInclude>
     </CudaCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -284,8 +284,8 @@
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <Link>
-      <AdditionalDependencies>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\lib\x64\cudart.lib;cudadevrt.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/lib/x64;C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/lib/x64/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\lib\x64\cudart.lib;cudadevrt.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/lib/x64;C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/lib/x64/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <DataExecutionPrevention></DataExecutionPrevention>
       <GenerateDebugInformation>false</GenerateDebugInformation>
@@ -308,7 +308,7 @@
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='RelWithDebInfo|x64'">
     <ClCompile>
       <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
-      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/include"</AdditionalOptions>
+      <AdditionalOptions>%(AdditionalOptions) /external:I "C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/include"</AdditionalOptions>
       <AssemblerListingLocation>$(IntDir)</AssemblerListingLocation>
       <BasicRuntimeChecks>Default</BasicRuntimeChecks>
       <DebugInformationFormat>ProgramDatabase</DebugInformationFormat>
@@ -331,10 +331,10 @@
     </ClCompile>
     <ResourceCompile>
       <PreprocessorDefinitions>%(PreprocessorDefinitions);WIN32;_WINDOWS;NDEBUG;NOMINMAX;WIN32_LEAN_AND_MEAN;CMAKE_INTDIR=\"RelWithDebInfo\";AffectorPOP_EXPORTS</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ResourceCompile>
     <CudaCompile>
-      <Include>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\include;%(Include)</Include>
+      <Include>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include;%(Include)</Include>
       <Defines>%(Defines);_WINDOWS;NDEBUG;NOMINMAX;WIN32_LEAN_AND_MEAN;CMAKE_INTDIR="RelWithDebInfo";AffectorPOP_EXPORTS</Defines>
       <AdditionalOptions>%(AdditionalOptions) -std=c++17 --generate-code=arch=compute_75,code=[compute_75,sm_75] --generate-code=arch=compute_86,code=[compute_86,sm_86] --generate-code=arch=compute_89,code=[compute_89,sm_89] -Xcompiler="/EHsc -Zi -Ob1"</AdditionalOptions>
       <CodeGeneration></CodeGeneration>
@@ -348,7 +348,7 @@
       <UseHostInclude>false</UseHostInclude>
     </CudaCompile>
     <Midl>
-      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
+      <AdditionalIncludeDirectories>C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\sdk;C:\Users\dewpo\Documents\Code\TouchDesigner Plugins\AffectorPOP\src;C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\include;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
       <OutputDirectory>$(ProjectDir)/$(IntDir)</OutputDirectory>
       <HeaderFileName>%(Filename).h</HeaderFileName>
       <TypeLibraryName>%(Filename).tlb</TypeLibraryName>
@@ -356,8 +356,8 @@
       <ProxyFileName>%(Filename)_p.c</ProxyFileName>
     </Midl>
     <Link>
-      <AdditionalDependencies>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.8\lib\x64\cudart.lib;cudadevrt.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
-      <AdditionalLibraryDirectories>C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/lib/x64;C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.8/lib/x64/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
+      <AdditionalDependencies>C:\Program Files\NVIDIA GPU Computing Toolkit\CUDA\v12.9\lib\x64\cudart.lib;cudadevrt.lib;cudart_static.lib;kernel32.lib;user32.lib;gdi32.lib;winspool.lib;shell32.lib;ole32.lib;oleaut32.lib;uuid.lib;comdlg32.lib;advapi32.lib</AdditionalDependencies>
+      <AdditionalLibraryDirectories>C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/lib/x64;C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v12.9/lib/x64/$(Configuration);%(AdditionalLibraryDirectories)</AdditionalLibraryDirectories>
       <AdditionalOptions>%(AdditionalOptions) /machine:x64</AdditionalOptions>
       <DataExecutionPrevention></DataExecutionPrevention>
       <GenerateDebugInformation>true</GenerateDebugInformation>
@@ -449,6 +449,6 @@ if %errorlevel% neq 0 goto :VCEnd</Command>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
-    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.8.targets" />
+    <Import Project="$(VCTargetsPath)\BuildCustomizations\CUDA 12.9.targets" />
   </ImportGroup>
 </Project>
