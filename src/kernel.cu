@@ -79,6 +79,10 @@ __global__ void affectorKernel(const float3* Pin, float3* Pout, const float3* Vi
             break; }
     }
 
+    // Field Mask: spatially scale ANY force by the upstream 'field' scalar (skip mode 5, which already
+    // uses 'field' as its force source). Lets a Dew Field sculpt where turbulence/vortex/etc. act.
+    if(ap.fieldMask && ap.type != 5){ float w = field?field[i]:1.0f; F = F * w; }
+
     V = V + F*ap.dt;
     if(Vout) Vout[i]=V;
     if(Pout) Pout[i] = ap.integrate ? (P + V*ap.dt) : P;

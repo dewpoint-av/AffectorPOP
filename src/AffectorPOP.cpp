@@ -142,6 +142,7 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
     ap.radius   = (float)inputs->getParDouble("Radius");
     ap.animT    = (float)inputs->getParDouble("Animoffset");
     ap.dt       = (float)inputs->getParDouble("Timestep");
+    ap.fieldMask= inputs->getParInt("Fieldmask");
     bool selfSim = inputs->getParInt("Selfsim") != 0;
     ap.integrate= selfSim ? 1 : inputs->getParInt("Integrate");   // self-sim always integrates internally
 
@@ -280,6 +281,13 @@ AffectorPOP::setupParameters(OP_ParameterManager* manager, void*)
     f("Radius", "Attractor Radius (0=1/d^2)", 0.0, 0.0, 20.0);
     f("Animoffset", "Turbulence Anim Offset", 0.0, 0.0, 100.0);
     f("Timestep", "Timestep (dt)", 1.0/60.0, 0.0, 0.1);
+    {
+        // Field Mask: multiply the selected force by the upstream Dew Field's 'field' scalar, so the field
+        // spatially sculpts where/how strongly ANY force mode acts. (Field Force mode already uses the field.)
+        OP_NumericParameter np; np.name = "Fieldmask"; np.label = "Field Mask"; np.page = "Affector";
+        np.defaultValues[0] = 0; np.minValues[0] = 0; np.maxValues[0] = 1;
+        manager->appendToggle(np);
+    }
     {
         // Default ON: works out-of-the-box on regular point systems (the Affector moves the points).
         // NOTE: turn this OFF when driving the SPH fluid in its feedback loop — the SPH owns position

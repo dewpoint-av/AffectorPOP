@@ -12,4 +12,5 @@ struct AffectorParams
     float animT  = 0.0f;            // turbulence animation offset
     float dt     = 1.0f / 60.0f;    // timestep
     int   integrate = 0;            // 1 => also integrate P += v*dt (feedback-loop stepper)
+    int   fieldMask = 0;            // 1 => multiply the force by the upstream 'field' scalar (spatial mask)
 };
