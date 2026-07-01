@@ -49,8 +49,20 @@ AffectorPOP::getAllAttributes(POP_AttributeClass c, const OP_POPInput* input)
     {
         const POP_Attribute* attr = input->getAttribute(c, i, nullptr);
         if (!attr) continue;
-        // CPUOrCUDA: leave buffers in place for safe pass-through (no forced GPU download, which
-        // would require begin/end bracketing even on pass-through paths => freeze).
+        // Skip ARRAY attributes (e.g. the step3 Neighbor POP's 'Nebr', 64-wide neighbor indices):
+        // fetching/passing a wide per-point array buffer through the CUDA-POP interop hangs TD, and the
+        // Affector doesn't need them (the Neighbor POP recomputes them downstream every cook).
+        if (attr->info.arraySize > 1) continue;
+        // Skip the kernel-handled point attrs (P/v/fieldDir/field): they are fetched ONCE as CUDA in
+        // execute() and reused for both the kernel and the P pass-through. Fetching them here too
+        // (CPUOrCUDA) double-maps the same GL/SSBO buffer per cook — the interop conflict that hangs TD
+        // on cook-context changes (zoom out / node switch). The CudaPOP SDK sample fetches each once.
+        {
+            const std::string nm = attr->info.name;
+            if (c == POP_AttributeClass::Point &&
+                (nm == "P" || nm == "v" || nm == "fieldDir" || nm == "field")) continue;
+        }
+        // CPUOrCUDA: leave buffers in place for safe pass-through (no forced GPU download).
         POP_GetBufferInfo info; info.location = POP_BufferLocation::CPUOrCUDA; info.stream = myStream;
         res.emplace_back(std::string(attr->info.name), attr->getBuffer(info, nullptr));
     }
@@ -96,15 +108,13 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
     uint32_t n = piCPU ? ((POP_PointInfo*)piCPU->getData(nullptr))->numPoints : maxInfo.points;
     myLastNumPoints = n;
 
-    bool haveP=false, haveV=false, haveFD=false, haveFL=false;
-    for (auto& a : pointAttrs)
-    {
-        if      (a.first == "P")        haveP  = true;
-        else if (a.first == "v")        haveV  = true;
-        else if (a.first == "fieldDir") haveFD = true;
-        else if (a.first == "field")    haveFL = true;
-    }
-    if (!haveP) { myError = "Input has no 'P' point attribute."; }
+    // Kernel attributes are intentionally EXCLUDED from pointAttrs (see getAllAttributes) so they are
+    // fetched exactly once; query them directly here.
+    const POP_Attribute* pA  = input->getAttribute(POP_AttributeClass::Point, "P", nullptr);
+    const POP_Attribute* vA  = input->getAttribute(POP_AttributeClass::Point, "v", nullptr);
+    const POP_Attribute* fdA = input->getAttribute(POP_AttributeClass::Point, "fieldDir", nullptr);
+    const POP_Attribute* flA = input->getAttribute(POP_AttributeClass::Point, "field", nullptr);
+    if (!pA) { myError = "Input has no 'P' point attribute."; }
 
     AffectorParams ap;
     ap.type = inputs->getParInt("Forcetype");
@@ -126,46 +136,35 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
         return myContext->createBuffer(bi, nullptr);
     };
 
-    OP_SmartRef<POP_Buffer> Vout, Pout;
-    if (haveP && n > 0)
+    OP_SmartRef<POP_Buffer> Vout, Pout, Pin;   // Pin hoisted so P can pass through when not integrating
+    if (pA && n > 0)
     {
-        const POP_Attribute* pA  = input->getAttribute(POP_AttributeClass::Point, "P", nullptr);
-        const POP_Attribute* vA  = haveV  ? input->getAttribute(POP_AttributeClass::Point, "v", nullptr)        : nullptr;
-        const POP_Attribute* fdA = haveFD ? input->getAttribute(POP_AttributeClass::Point, "fieldDir", nullptr) : nullptr;
-        const POP_Attribute* flA = haveFL ? input->getAttribute(POP_AttributeClass::Point, "field", nullptr)    : nullptr;
+        // Fetch the kernel's inputs ONCE, as CUDA. getBuffer({CUDA}) (the interop map) is called OUTSIDE
+        // begin/end (the known-good pattern — moving it inside froze faster); device access is getData()
+        // INSIDE begin/end.
+        POP_GetBufferInfo cgia; cgia.location = POP_BufferLocation::CUDA; cgia.stream = myStream;
+        Pin = pA->getBuffer(cgia, nullptr);
+        OP_SmartRef<POP_Buffer> Vin  = vA  ? vA->getBuffer(cgia, nullptr)  : OP_SmartRef<POP_Buffer>();
+        OP_SmartRef<POP_Buffer> FDin = fdA ? fdA->getBuffer(cgia, nullptr) : OP_SmartRef<POP_Buffer>();
+        OP_SmartRef<POP_Buffer> FLin = flA ? flA->getBuffer(cgia, nullptr) : OP_SmartRef<POP_Buffer>();
 
-        if (pA)
+        if (Pin)
         {
-            Vout = makeBuf(3 * sizeof(float));                 // always output velocity (createBuffer: device alloc)
+            Vout = makeBuf(3 * sizeof(float));                 // always output velocity
             if (ap.integrate) Pout = makeBuf(3 * sizeof(float));
 
-            // CRITICAL: the forced-CUDA getBuffer() calls (the GL/SSBO->CUDA interop map) MUST live
-            // INSIDE beginCUDAOperations/endCUDAOperations. Calling them outside leaks an interop
-            // registration per cook => the driver hangs after ~a couple seconds (esp. with a live GLSL-
-            // SPH input re-mapping a fresh SSBO every frame, and outside a feedback loop). See the
-            // suite's hard-won CUDA-POP lessons (#3).
-            POP_GetBufferInfo cgia; cgia.location = POP_BufferLocation::CUDA; cgia.stream = myStream;
             myContext->beginCUDAOperations(nullptr);
-            OP_SmartRef<POP_Buffer> Pin  = pA->getBuffer(cgia, nullptr);
-            OP_SmartRef<POP_Buffer> Vin  = vA  ? vA->getBuffer(cgia, nullptr)  : OP_SmartRef<POP_Buffer>();
-            OP_SmartRef<POP_Buffer> FDin = fdA ? fdA->getBuffer(cgia, nullptr) : OP_SmartRef<POP_Buffer>();
-            OP_SmartRef<POP_Buffer> FLin = flA ? flA->getBuffer(cgia, nullptr) : OP_SmartRef<POP_Buffer>();
-            if (Pin)
-            {
-                launchAffector(Pin->getData(nullptr), Pout ? Pout->getData(nullptr) : nullptr,
-                               Vin ? Vin->getData(nullptr) : nullptr, Vout ? Vout->getData(nullptr) : nullptr,
-                               FDin ? FDin->getData(nullptr) : nullptr, FLin ? FLin->getData(nullptr) : nullptr,
-                               n, ap, myStream);
-            }
+            launchAffector(Pin->getData(nullptr), Pout ? Pout->getData(nullptr) : nullptr,
+                           Vin ? Vin->getData(nullptr) : nullptr, Vout ? Vout->getData(nullptr) : nullptr,
+                           FDin ? FDin->getData(nullptr) : nullptr, FLin ? FLin->getData(nullptr) : nullptr,
+                           n, ap, myStream);
             myContext->endCUDAOperations(nullptr);
         }
     }
 
     POP_SetBufferInfo sinfo; sinfo.stream = myStream;
-    std::vector<std::string> skip;
-    if (Vout) skip.push_back("v");
-    if (Pout) skip.push_back("P");
-    copyAllAttributes(POP_AttributeClass::Point, pointAttrs, sinfo, input, output, skip);
+    // pointAttrs already excludes P/v/fieldDir/field, so no skip list is needed.
+    copyAllAttributes(POP_AttributeClass::Point, pointAttrs, sinfo, input, output, {});
 
     auto setAttr = [&](OP_SmartRef<POP_Buffer>& b, const char* name)
     {
@@ -175,8 +174,9 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
         ai.attribClass = POP_AttributeClass::Point;
         output->setAttribute(&b, ai, sinfo, nullptr);
     };
-    if (Vout) setAttr(Vout, "v");
-    if (Pout) setAttr(Pout, "P");
+    if (Vout) setAttr(Vout, "v");                                          // affector velocity
+    if (Pout) setAttr(Pout, "P");                                          // integrated position, OR:
+    else if (Pin && pA) output->setAttribute(&Pin, pA->info, sinfo, nullptr); // pass input P through unchanged
 
     copyAllAttributes(POP_AttributeClass::Vertex, vertAttrs, sinfo, input, output, {});
     copyAllAttributes(POP_AttributeClass::Primitive, primAttrs, sinfo, input, output, {});
