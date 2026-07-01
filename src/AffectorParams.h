@@ -13,4 +13,8 @@ struct AffectorParams
     float dt     = 1.0f / 60.0f;    // timestep
     int   integrate = 0;            // 1 => also integrate P += v*dt (feedback-loop stepper)
     int   fieldMask = 0;            // 1 => multiply the force by the upstream 'field' scalar (spatial mask)
+    float damping   = 0.0f;         // per-step velocity loss [0..1] — bounds accumulation (vortex won't spiral out forever)
+    float maxSpeed  = 0.0f;         // hard velocity clamp (0 = off) — stability under big param changes
+    // interactive point force (mouse/touch): radial pull(+)/push(-) at a driven position, within a radius
+    float interactStrength = 0.0f, interactRadius = 0.5f; float ipx=0,ipy=0,ipz=0;
 };

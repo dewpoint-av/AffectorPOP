@@ -83,7 +83,16 @@ __global__ void affectorKernel(const float3* Pin, float3* Pout, const float3* Vi
     // uses 'field' as its force source). Lets a Dew Field sculpt where turbulence/vortex/etc. act.
     if(ap.fieldMask && ap.type != 5){ float w = field?field[i]:1.0f; F = F * w; }
 
+    // Interactive point force (mouse/touch): additive radial pull/push at a driven position, within radius.
+    if(ap.interactStrength != 0.0f){
+        float3 dd = make_float3(ap.ipx,ap.ipy,ap.ipz) - P; float dist = len3(dd);
+        float fall = (ap.interactRadius>0.0f)? fmaxf(0.0f,1.0f-dist/ap.interactRadius):0.0f;
+        F = F + norm3(dd)*(ap.interactStrength*fall);
+    }
+
     V = V + F*ap.dt;
+    V = V * (1.0f - ap.damping);          // bound velocity so vortex/forces don't accumulate to infinity
+    if(ap.maxSpeed > 0.0f){ float s=len3(V); if(s>ap.maxSpeed) V = V*(ap.maxSpeed/s); }  // stability clamp
     if(Vout) Vout[i]=V;
     if(Pout) Pout[i] = ap.integrate ? (P + V*ap.dt) : P;
 }

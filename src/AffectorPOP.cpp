@@ -143,6 +143,11 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
     ap.animT    = (float)inputs->getParDouble("Animoffset");
     ap.dt       = (float)inputs->getParDouble("Timestep");
     ap.fieldMask= inputs->getParInt("Fieldmask");
+    ap.damping  = (float)inputs->getParDouble("Damping");
+    ap.maxSpeed = (float)inputs->getParDouble("Maxspeed");
+    ap.interactStrength = (float)inputs->getParDouble("Interact");
+    ap.interactRadius   = (float)inputs->getParDouble("Interactradius");
+    { double a,b,c; inputs->getParDouble3("Interactpos", a,b,c); ap.ipx=(float)a; ap.ipy=(float)b; ap.ipz=(float)c; }
     bool selfSim = inputs->getParInt("Selfsim") != 0;
     ap.integrate= selfSim ? 1 : inputs->getParInt("Integrate");   // self-sim always integrates internally
 
@@ -281,6 +286,8 @@ AffectorPOP::setupParameters(OP_ParameterManager* manager, void*)
     f("Radius", "Attractor Radius (0=1/d^2)", 0.0, 0.0, 20.0);
     f("Animoffset", "Turbulence Anim Offset", 0.0, 0.0, 100.0);
     f("Timestep", "Timestep (dt)", 1.0/60.0, 0.0, 0.1);
+    f("Damping", "Velocity Damping", 0.05, 0.0, 1.0);   // bounds accumulation; 0 = raw/undamped (can spiral out)
+    f("Maxspeed", "Max Speed (0=off)", 0.0, 0.0, 100.0); // stability clamp under strong forces / param changes
     {
         // Field Mask: multiply the selected force by the upstream Dew Field's 'field' scalar, so the field
         // spatially sculpts where/how strongly ANY force mode acts. (Field Force mode already uses the field.)
@@ -308,4 +315,11 @@ AffectorPOP::setupParameters(OP_ParameterManager* manager, void*)
         OP_NumericParameter np; np.name = "Reset"; np.label = "Reset"; np.page = "Affector";
         manager->appendPulse(np);   // re-seed the self-sim state from the current input
     }
+    // Interactive point force (drive Interact Position with a Mouse In / touch CHOP) — additive on top of Force Type.
+    f("Interact", "Interact Strength (+/-)", 0.0, -50.0, 50.0);
+    f("Interactradius", "Interact Radius", 0.5, 0.01, 10.0);
+    { OP_NumericParameter np; np.name="Interactpos"; np.label="Interact Position"; np.page="Affector";
+      np.defaultValues[0]=0; np.defaultValues[1]=0; np.defaultValues[2]=0;
+      for(int k=0;k<3;++k){ np.minSliders[k]=-5; np.maxSliders[k]=5; }
+      manager->appendXYZ(np); }
 }
