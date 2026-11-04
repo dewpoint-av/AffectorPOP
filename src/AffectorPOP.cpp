@@ -7,6 +7,18 @@ extern "C" cudaError_t
 launchAffector(const void* Pin, void* Pout, const void* Vin, void* Vout,
                const void* fieldDir, const void* field, unsigned int n,
                const AffectorParams& ap, cudaStream_t stream);
+extern "C" cudaError_t
+launchAffectorEmitSink(float3* pos, float3* vel, float* age, unsigned int n, const AffectorParams& ap,
+                       const float3* emitP, const float3* emitV, const float3* emitPrev,
+                       float invDt, int emitN, int usePop, cudaStream_t stream);
+extern "C" cudaError_t
+launchAffectorAgeSeed(float* age, unsigned int n, float life, int seed, cudaStream_t stream);
+extern "C" cudaError_t
+launchAffectorSeedRoundRobin(float3* dst, const float3* src, unsigned int n, unsigned int srcN, cudaStream_t stream);
+extern "C" cudaError_t
+launchAffectorEmitterCouple(float3* vel, const float3* pos, unsigned int n,
+                            const float3* emitP, const float3* emitPrev, int emitN,
+                            float invDt, float motionGain, float coupling, float radius, cudaStream_t stream);
 
 // ---------------------------------------------------------------- plugin exports
 extern "C"
@@ -41,6 +53,8 @@ AffectorPOP::~AffectorPOP()
 {
     if (myStateP) cudaFree(myStateP);
     if (myStateV) cudaFree(myStateV);
+    if (myStateAge) cudaFree(myStateAge);
+    if (myEmitPrev) cudaFree(myEmitPrev);
     if (myStream) cudaStreamDestroy(myStream);
 }
 
@@ -53,7 +67,7 @@ void AffectorPOP::getGeneralInfo(POP_GeneralInfo* ginfo, const OP_Inputs* inputs
 
 void AffectorPOP::pulsePressed(const char* name, void*)
 {
-    if (name && std::string(name) == "Reset") myReseed = true;   // re-seed state from the input
+    if (name && std::string(name) == "Reset") { myReseed = true; myLockedN = 0; }   // re-seed state from the input
 }
 
 std::vector<std::pair<std::string, OP_SmartRef<POP_Buffer>>>
@@ -149,7 +163,37 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
     ap.interactRadius   = (float)inputs->getParDouble("Interactradius");
     { double a,b,c; inputs->getParDouble3("Interactpos", a,b,c); ap.ipx=(float)a; ap.ipy=(float)b; ap.ipz=(float)c; }
     bool selfSim = inputs->getParInt("Selfsim") != 0;
+    uint32_t nIn = n;   // input point count (for round-robin seed source)
+    if (selfSim)
+    {
+        int maxParticles = inputs->getParInt("Maxparticles");
+        n = (maxParticles > 0) ? (uint32_t)maxParticles : (myLockedN > 0 ? myLockedN : nIn);
+    }
     ap.integrate= selfSim ? 1 : inputs->getParInt("Integrate");   // self-sim always integrates internally
+    ap.emitOn  = inputs->getParInt("Emiton");
+    ap.life    = (float)inputs->getParDouble("Life");
+    ap.motionGain = (float)inputs->getParDouble("Motiongain");
+    ap.coupling   = (float)inputs->getParDouble("Coupling");
+    ap.coupleRadius = (float)inputs->getParDouble("Coupleradius");
+
+    // ---- optional POP-reference emitter: an animated POP's points become the emission source ----
+    OP_SmartRef<POP_Buffer> EmitPin, EmitVin; uint32_t emitN = 0;
+    {
+        const OP_POPInput* emitPop = inputs->getParPOP("Emitpop");
+        if (emitPop)
+        {
+            POP_GetBufferInfo ecgi; ecgi.location = POP_BufferLocation::CPU;
+            OP_SmartRef<POP_Buffer> epiCPU = emitPop->getPointInfo(ecgi, nullptr);
+            POP_MaxInfo emax; emitPop->getMaxInfo(&emax, nullptr);
+            emitN = epiCPU ? ((POP_PointInfo*)epiCPU->getData(nullptr))->numPoints : emax.points;
+            POP_GetBufferInfo ecgia; ecgia.location = POP_BufferLocation::CUDA; ecgia.stream = myStream;
+            const POP_Attribute* eA  = emitPop->getAttribute(POP_AttributeClass::Point, "P", nullptr);
+            const POP_Attribute* evA = emitPop->getAttribute(POP_AttributeClass::Point, "v", nullptr);
+            if (eA && emitN > 0) { EmitPin = eA->getBuffer(ecgia, nullptr); if (!EmitPin) emitN = 0; }
+            else emitN = 0;
+            if (evA && emitN > 0) EmitVin = evA->getBuffer(ecgia, nullptr);
+        }
+    }
 
     auto makeBuf = [&](uint64_t elemSize) -> OP_SmartRef<POP_Buffer>
     {
@@ -158,7 +202,7 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
         return myContext->createBuffer(bi, nullptr);
     };
 
-    OP_SmartRef<POP_Buffer> Vout, Pout, Pin;   // Pin hoisted so P can pass through when not integrating
+    OP_SmartRef<POP_Buffer> Vout, Pout, Pin, idxOut, ptInfo, tpInfo;   // Pin hoisted so P can pass through when not integrating
     if (pA && n > 0)
     {
         // Fetch the kernel's inputs ONCE, as CUDA. getBuffer({CUDA}) (the interop map) is called OUTSIDE
@@ -175,6 +219,25 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
             Vout = makeBuf(3 * sizeof(float));                 // always output velocity
             if (ap.integrate) Pout = makeBuf(3 * sizeof(float));
 
+            // Self-sim mode owns its point pool, so emit its own CPU topology (created before begin/end).
+            if (selfSim)
+            {
+                auto makeCPUBuffer = [&](uint64_t size, POP_BufferUsage usage) -> OP_SmartRef<POP_Buffer>
+                {
+                    POP_BufferInfo bi; bi.size = size; bi.location = POP_BufferLocation::CPU;
+                    bi.mode = POP_BufferMode::ReadWrite; bi.usage = usage;
+                    OP_SmartRef<POP_Buffer> b = myContext->createBuffer(bi, nullptr);
+                    if (b) std::memset(b->getData(nullptr), 0, size);
+                    return b;
+                };
+                idxOut = makeCPUBuffer((uint64_t)n * sizeof(uint32_t), POP_BufferUsage::IndexBuffer);
+                if (idxOut) { uint32_t* ix = (uint32_t*)idxOut->getData(nullptr); for (uint32_t k = 0; k < n; ++k) ix[k] = k; }
+                ptInfo = makeCPUBuffer(sizeof(POP_PointInfo), POP_BufferUsage::PointInfoBuffer);
+                if (ptInfo) ((POP_PointInfo*)ptInfo->getData(nullptr))->numPoints = n;
+                tpInfo = makeCPUBuffer(sizeof(POP_TopologyInfo), POP_BufferUsage::TopologyInfoBuffer);
+                if (tpInfo) { POP_TopologyInfo* t = (POP_TopologyInfo*)tpInfo->getData(nullptr); t->pointPrimitivesCount = n; }
+            }
+
             myContext->beginCUDAOperations(nullptr);
             if (selfSim && Pout)
             {
@@ -186,15 +249,21 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
                 {
                     if (myStateP) { cudaFree(myStateP); myStateP = nullptr; }
                     if (myStateV) { cudaFree(myStateV); myStateV = nullptr; }
+                    if (myStateAge) { cudaFree(myStateAge); myStateAge = nullptr; }
                     cudaError_t ea = cudaMalloc(&myStateP, bytes);
                     cudaError_t eb = cudaMalloc(&myStateV, bytes);
-                    if (ea != cudaSuccess || eb != cudaSuccess) { myError = "Self-sim allocation failed"; myStateN = 0; }
+                    cudaError_t ec = cudaMalloc(&myStateAge, (size_t)n * sizeof(float));
+                    if (ea != cudaSuccess || eb != cudaSuccess || ec != cudaSuccess) { myError = "Self-sim allocation failed"; myStateN = 0; }
                     else
                     {
-                        cudaMemcpyAsync(myStateP, Pin->getData(nullptr), bytes, cudaMemcpyDeviceToDevice, myStream);
+                        if (n == nIn)
+                            cudaMemcpyAsync(myStateP, Pin->getData(nullptr), bytes, cudaMemcpyDeviceToDevice, myStream);
+                        else
+                            launchAffectorSeedRoundRobin((float3*)myStateP, (const float3*)Pin->getData(nullptr), n, nIn, myStream);
                         if (Vin) cudaMemcpyAsync(myStateV, Vin->getData(nullptr), bytes, cudaMemcpyDeviceToDevice, myStream);
                         else     cudaMemsetAsync(myStateV, 0, bytes, myStream);
-                        myStateN = n; myReseed = false;
+                        launchAffectorAgeSeed((float*)myStateAge, n, ap.life, (int)myExecuteCount, myStream);
+                        myStateN = n; myLockedN = n; myReseed = false;
                     }
                 }
                 if (myStateP && myStateV)
@@ -204,6 +273,32 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
                     launchAffector(myStateP, myStateP, myStateV, myStateV,
                                    FDin ? FDin->getData(nullptr) : nullptr, FLin ? FLin->getData(nullptr) : nullptr,
                                    n, ap, myStream);
+                    if (ap.emitOn && EmitPin)   // recycle particles past their life at the POP emitter's points
+                    {
+                        const float3* emitP = (const float3*)EmitPin->getData(nullptr);
+                        const float3* emitV = EmitVin ? (const float3*)EmitVin->getData(nullptr) : nullptr;
+                        const float3* emitPrev = nullptr;
+                        if (emitN > 0)
+                        {
+                            if (myEmitPrevN != emitN || !myEmitPrev)
+                            {
+                                if (myEmitPrev) cudaFree(myEmitPrev);
+                                cudaMalloc(&myEmitPrev, (size_t)emitN * sizeof(float3));
+                                myEmitPrevN = emitN; myHaveEmitPrev = false;
+                            }
+                            if (myHaveEmitPrev) emitPrev = (const float3*)myEmitPrev;
+                        }
+                        float invDt = (ap.dt > 0.0f) ? (1.0f / ap.dt) : 60.0f;
+                        launchAffectorEmitSink((float3*)myStateP, (float3*)myStateV, (float*)myStateAge, n, ap,
+                                               emitP, emitV, emitPrev, invDt, (int)emitN, 1, myStream);
+                        if (emitPrev)   // continuous coupling: drag nearby particles with the emitter's motion
+                            launchAffectorEmitterCouple((float3*)myStateV, (const float3*)myStateP, n, emitP, emitPrev, (int)emitN, invDt, ap.motionGain, ap.coupling, ap.coupleRadius, myStream);
+                        if (emitN > 0)
+                        {
+                            cudaMemcpyAsync(myEmitPrev, emitP, (size_t)emitN * sizeof(float3), cudaMemcpyDeviceToDevice, myStream);
+                            myHaveEmitPrev = true;
+                        }
+                    }
                     cudaMemcpyAsync(Pout->getData(nullptr), myStateP, bytes, cudaMemcpyDeviceToDevice, myStream);
                     cudaMemcpyAsync(Vout->getData(nullptr), myStateV, bytes, cudaMemcpyDeviceToDevice, myStream);
                 }
@@ -237,8 +332,20 @@ AffectorPOP::execute(POP_Output* output, const OP_Inputs* inputs, void*)
 
     copyAllAttributes(POP_AttributeClass::Vertex, vertAttrs, sinfo, input, output, {});
     copyAllAttributes(POP_AttributeClass::Primitive, primAttrs, sinfo, input, output, {});
-    output->setIndexBuffer(&indexBuf, input->getIndexBuffer(nullptr)->info, sinfo, nullptr);
-    output->setInfoBuffers(&infoBufs, sinfo, nullptr);
+    if (selfSim)
+    {
+        POP_IndexBufferInfo ii; ii.type = POP_IndexType::UInt32;
+        output->setIndexBuffer(&idxOut, ii, sinfo, nullptr);
+        POP_InfoBuffers outInfo;
+        outInfo.pointInfo = ptInfo;
+        outInfo.topoInfo = tpInfo;
+        output->setInfoBuffers(&outInfo, sinfo, nullptr);
+    }
+    else
+    {
+        output->setIndexBuffer(&indexBuf, input->getIndexBuffer(nullptr)->info, sinfo, nullptr);
+        output->setInfoBuffers(&infoBufs, sinfo, nullptr);
+    }
 }
 
 // ---------------------------------------------------------------- info / params
@@ -322,4 +429,18 @@ AffectorPOP::setupParameters(OP_ParameterManager* manager, void*)
       np.defaultValues[0]=0; np.defaultValues[1]=0; np.defaultValues[2]=0;
       for(int k=0;k<3;++k){ np.minSliders[k]=-5; np.maxSliders[k]=5; }
       manager->appendXYZ(np); }
+    // POP-reference emitter (Self-Simulate mode): particles below Sink Y recycle at the referenced POP's points.
+    { OP_StringParameter sp; sp.name="Emitpop"; sp.label="Emit POP (reference)"; sp.page="Emitter"; manager->appendPOP(sp); }
+    { OP_NumericParameter np; np.name="Emiton"; np.label="Emitter On"; np.page="Emitter";
+      np.defaultValues[0]=0; np.minValues[0]=0; np.maxValues[0]=1; manager->appendToggle(np); }
+    { OP_NumericParameter np; np.name="Life"; np.label="Particle Life (s)"; np.page="Emitter";
+      np.defaultValues[0]=5.0; np.minValues[0]=0; np.minSliders[0]=0; np.maxSliders[0]=60; np.clampMins[0]=true; manager->appendFloat(np); }
+    { OP_NumericParameter np; np.name="Motiongain"; np.label="Motion Gain"; np.page="Emitter";
+      np.defaultValues[0]=1.0; np.minValues[0]=0; np.minSliders[0]=0; np.maxSliders[0]=5; np.clampMins[0]=true; manager->appendFloat(np); }
+    { OP_NumericParameter np; np.name="Coupling"; np.label="Emitter Coupling"; np.page="Emitter";
+      np.defaultValues[0]=0.5; np.minValues[0]=0; np.minSliders[0]=0; np.maxSliders[0]=1; np.clampMins[0]=true; manager->appendFloat(np); }
+    { OP_NumericParameter np; np.name="Coupleradius"; np.label="Coupling Radius"; np.page="Emitter";
+      np.defaultValues[0]=0.5; np.minValues[0]=0; np.minSliders[0]=0; np.maxSliders[0]=5; np.clampMins[0]=true; manager->appendFloat(np); }
+    { OP_NumericParameter np; np.name="Maxparticles"; np.label="Max Particles"; np.page="Emitter";
+      np.defaultValues[0]=0; np.minValues[0]=0; np.minSliders[0]=0; np.maxSliders[0]=1000000; np.clampMins[0]=true; manager->appendInt(np); }
 }

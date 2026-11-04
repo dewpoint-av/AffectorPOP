@@ -99,6 +99,103 @@ __global__ void affectorKernel(const float3* Pin, float3* Pout, const float3* Vi
 
 static int divUp(int a,int b){return (a+b-1)/b;}
 
+// Stagger initial particle ages across [0, life) so the population dies gradually.
+__global__ void kAffectorAgeSeed(float* age, int n, float life, int seed)
+{
+    int i = blockIdx.x*blockDim.x+threadIdx.x; if (i>=n) return;
+    age[i] = hashf(i*0.017f, seed*0.031f, 1.3f) * fmaxf(life, 0.0f);
+}
+
+// POP-reference emitter: each particle ages by dt; when its age exceeds Life it respawns at the
+// referenced POP's animated points (round-robin), inheriting its velocity. Self-Simulate mode only.
+__global__ void kAffectorEmitSink(float3* pos, float3* vel, float* age, int n, AffectorParams ap,
+                                  const float3* emitP, const float3* emitV, const float3* emitPrev,
+                                  float invDt, int emitN, int usePop)
+{
+    int i = blockIdx.x*blockDim.x+threadIdx.x; if (i>=n || !ap.emitOn) return;
+    age[i] += ap.dt;
+    if (usePop && emitP && emitN > 0 && ap.life > 0.0f && age[i] > ap.life)
+    {
+        int e = i % emitN;
+        pos[i] = emitP[e];
+        if (emitPrev)   // depth-velocity: inherit the emitter's motion (scaled by motion gain)
+            vel[i] = make_float3((emitP[e].x - emitPrev[e].x) * invDt * ap.motionGain,
+                                 (emitP[e].y - emitPrev[e].y) * invDt * ap.motionGain,
+                                 (emitP[e].z - emitPrev[e].z) * invDt * ap.motionGain);
+        else if (emitV)
+            vel[i] = emitV[e];
+        else
+            vel[i] = make_float3(0,0,0);
+        age[i] = 0.0f;
+    }
+}
+
+extern "C" cudaError_t
+launchAffectorAgeSeed(float* age, unsigned int n, float life, int seed, cudaStream_t stream)
+{
+    if (n==0) return cudaSuccess;
+    dim3 b(128), g(divUp((int)n,128));
+    kAffectorAgeSeed<<<g,b,0,stream>>>(age, (int)n, life, seed);
+    return cudaGetLastError();
+}
+
+// Place n particles at the source points round-robin (fountain seed: pool size decoupled from the source).
+__global__ void kSeedRoundRobin(float3* dst, const float3* src, int n, int srcN)
+{
+    int i = blockIdx.x*blockDim.x+threadIdx.x; if (i>=n || srcN <= 0) return;
+    dst[i] = src[i % srcN];
+}
+extern "C" cudaError_t
+launchAffectorSeedRoundRobin(float3* dst, const float3* src, unsigned int n, unsigned int srcN, cudaStream_t stream)
+{
+    if (n==0 || srcN==0) return cudaSuccess;
+    dim3 b(128), g(divUp((int)n,128));
+    kSeedRoundRobin<<<g,b,0,stream>>>(dst, src, (int)n, (int)srcN);
+    return cudaGetLastError();
+}
+
+extern "C" cudaError_t
+launchAffectorEmitSink(float3* pos, float3* vel, float* age, unsigned int n, const AffectorParams& ap,
+                       const float3* emitP, const float3* emitV, const float3* emitPrev,
+                       float invDt, int emitN, int usePop, cudaStream_t stream)
+{
+    if (n==0) return cudaSuccess;
+    dim3 b(128), g(divUp((int)n,128));
+    kAffectorEmitSink<<<g,b,0,stream>>>(pos, vel, age, (int)n, ap, emitP, emitV, emitPrev, invDt, emitN, usePop);
+    return cudaGetLastError();
+}
+
+// Continuous emitter coupling: blend each particle's velocity toward its assigned emitter point's
+// frame-to-frame velocity (depth-velocity), with distance falloff. Self-Simulate mode only.
+__global__ void kEmitterCouple(float3* vel, const float3* pos, int n,
+                               const float3* emitP, const float3* emitPrev, int emitN,
+                               float invDt, float motionGain, float coupling, float radius)
+{
+    int i = blockIdx.x*blockDim.x+threadIdx.x; if (i>=n) return;
+    if (!emitP || !emitPrev || emitN <= 0 || coupling <= 0.0f) return;
+    int e = i % emitN;
+    float3 ev = make_float3((emitP[e].x - emitPrev[e].x) * invDt * motionGain,
+                            (emitP[e].y - emitPrev[e].y) * invDt * motionGain,
+                            (emitP[e].z - emitPrev[e].z) * invDt * motionGain);
+    float dx = pos[i].x - emitP[e].x, dy = pos[i].y - emitP[e].y, dz = pos[i].z - emitP[e].z;
+    float d2 = dx*dx + dy*dy + dz*dz;
+    float w = (radius <= 0.0f) ? 1.0f : fmaxf(0.0f, 1.0f - d2 / (radius*radius));
+    float c = coupling * w;
+    vel[i] = make_float3(vel[i].x + (ev.x - vel[i].x) * c,
+                         vel[i].y + (ev.y - vel[i].y) * c,
+                         vel[i].z + (ev.z - vel[i].z) * c);
+}
+extern "C" cudaError_t
+launchAffectorEmitterCouple(float3* vel, const float3* pos, unsigned int n,
+                            const float3* emitP, const float3* emitPrev, int emitN,
+                            float invDt, float motionGain, float coupling, float radius, cudaStream_t stream)
+{
+    if (n==0) return cudaSuccess;
+    dim3 b(128), g(divUp((int)n,128));
+    kEmitterCouple<<<g,b,0,stream>>>(vel, pos, (int)n, emitP, emitPrev, emitN, invDt, motionGain, coupling, radius);
+    return cudaGetLastError();
+}
+
 extern "C" cudaError_t
 launchAffector(const void* Pin, void* Pout, const void* Vin, void* Vout,
                const void* fieldDir, const void* field, unsigned int n,

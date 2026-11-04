@@ -17,4 +17,10 @@ struct AffectorParams
     float maxSpeed  = 0.0f;         // hard velocity clamp (0 = off) — stability under big param changes
     // interactive point force (mouse/touch): radial pull(+)/push(-) at a driven position, within a radius
     float interactStrength = 0.0f, interactRadius = 0.5f; float ipx=0,ipy=0,ipz=0;
+    // POP-reference emitter (self-sim mode): recycle particles when their age exceeds Life
+    int   emitOn = 0;      // 1 => recycle dead particles at the POP emitter's points
+    float life   = 5.0f;   // particle lifetime (seconds); 0 = live forever
+    float motionGain = 1.0f;   // scale on the emitter's frame-to-frame velocity (fluid kick)
+    float coupling = 0.5f;     // 0..1: how strongly particles blend toward the emitter's motion per frame
+    float coupleRadius = 0.5f; // distance falloff around each emitter point (0 = no falloff)
 };

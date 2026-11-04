@@ -45,6 +45,12 @@ private:
     // input P/v on first cook / point-count change / Reset pulse, stepped every frame (cookEveryFrame).
     void*              myStateP  = nullptr;   // float3[myStateN]
     void*              myStateV  = nullptr;   // float3[myStateN]
+    void*              myStateAge= nullptr;   // float[myStateN]  particle age (life-based recycling)
     uint32_t           myStateN  = 0;
+    uint32_t           myLockedN = 0;   // locked particle count (0 = not yet seeded)
     bool               myReseed  = true;
+    // Emitter POP previous-frame points (depth-velocity: derive emitter motion from frame-to-frame movement).
+    void*              myEmitPrev     = nullptr; // float3[emitN]
+    uint32_t           myEmitPrevN    = 0;
+    bool               myHaveEmitPrev = false;
 };
